@@ -1,0 +1,126 @@
+PRECIS Framework: https://tools.ietf.org/html/rfc7564
+UCD Documentation: http://www.unicode.org/reports/tr44/
+IANA Registry for CONTEXT{J,O} rules: https://www.iana.org/assignments/idna-tables-6.3.0/idna-tables-6.3.0.xhtml#idna-tables-context
+
+=Algorithm=
+If .cp. .in. Exceptions Then Exceptions(cp);
+Else If .cp. .in. BackwardCompatible Then BackwardCompatible(cp);
+Else If .cp. .in. Unassigned Then UNASSIGNED;
+Else If .cp. .in. ASCII7 Then PVALID;
+Else If .cp. .in. JoinControl Then CONTEXTJ;
+Else If .cp. .in. OldHangulJamo Then DISALLOWED;
+Else If .cp. .in. PrecisIgnorableProperties Then DISALLOWED;
+Else If .cp. .in. Controls Then DISALLOWED;
+Else If .cp. .in. HasCompat Then ID_DIS or FREE_PVAL;
+Else If .cp. .in. LetterDigits Then PVALID;
+Else If .cp. .in. OtherLetterDigits Then ID_DIS or FREE_PVAL;
+Else If .cp. .in. Spaces Then ID_DIS or FREE_PVAL;
+Else If .cp. .in. Symbols Then ID_DIS or FREE_PVAL;
+Else If .cp. .in. Punctuation Then ID_DIS or FREE_PVAL;
+Else DISALLOWED;
+
+=Exceptions (F)=
+F: cp is in {00B7, 00DF, 0375, 03C2, 05F3, 05F4, 0640, 0660,
+             0661, 0662, 0663, 0664, 0665, 0666, 0667, 0668,
+             0669, 06F0, 06F1, 06F2, 06F3, 06F4, 06F5, 06F6,
+             06F7, 06F8, 06F9, 06FD, 06FE, 07FA, 0F0B, 3007,
+             302E, 302F, 3031, 3032, 3033, 3034, 3035, 303B,
+             30FB}
+
+PVALID -- Would otherwise have been DISALLOWED
+
+00DF; PVALID     # LATIN SMALL LETTER SHARP S
+03C2; PVALID     # GREEK SMALL LETTER FINAL SIGMA
+06FD; PVALID     # ARABIC SIGN SINDHI AMPERSAND
+06FE; PVALID     # ARABIC SIGN SINDHI POSTPOSITION MEN
+0F0B; PVALID     # TIBETAN MARK INTERSYLLABIC TSHEG
+3007; PVALID     # IDEOGRAPHIC NUMBER ZERO
+
+CONTEXTO -- Would otherwise have been DISALLOWED
+
+00B7; CONTEXTO   # MIDDLE DOT
+0375; CONTEXTO   # GREEK LOWER NUMERAL SIGN (KERAIA)
+05F3; CONTEXTO   # HEBREW PUNCTUATION GERESH
+05F4; CONTEXTO   # HEBREW PUNCTUATION GERSHAYIM
+30FB; CONTEXTO   # KATAKANA MIDDLE DOT
+
+CONTEXTO -- Would otherwise have been PVALID
+
+0660; CONTEXTO   # ARABIC-INDIC DIGIT ZERO
+0661; CONTEXTO   # ARABIC-INDIC DIGIT ONE
+0662; CONTEXTO   # ARABIC-INDIC DIGIT TWO
+0663; CONTEXTO   # ARABIC-INDIC DIGIT THREE
+0664; CONTEXTO   # ARABIC-INDIC DIGIT FOUR
+0665; CONTEXTO   # ARABIC-INDIC DIGIT FIVE
+0666; CONTEXTO   # ARABIC-INDIC DIGIT SIX
+0667; CONTEXTO   # ARABIC-INDIC DIGIT SEVEN
+0668; CONTEXTO   # ARABIC-INDIC DIGIT EIGHT
+0669; CONTEXTO   # ARABIC-INDIC DIGIT NINE
+06F0; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT ZERO
+06F1; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT ONE
+06F2; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT TWO
+06F3; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT THREE
+06F4; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT FOUR
+06F5; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT FIVE
+06F6; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT SIX
+06F7; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT SEVEN
+06F8; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT EIGHT
+06F9; CONTEXTO   # EXTENDED ARABIC-INDIC DIGIT NINE
+
+DISALLOWED -- Would otherwise have been PVALID
+
+0640; DISALLOWED # ARABIC TATWEEL
+07FA; DISALLOWED # NKO LAJANYALAN
+302E; DISALLOWED # HANGUL SINGLE DOT TONE MARK
+302F; DISALLOWED # HANGUL DOUBLE DOT TONE MARK
+3031; DISALLOWED # VERTICAL KANA REPEAT MARK
+3032; DISALLOWED # VERTICAL KANA REPEAT WITH VOICED SOUND MARK
+3033; DISALLOWED # VERTICAL KANA REPEAT MARK UPPER HALF
+3034; DISALLOWED # VERTICAL KANA REPEAT WITH VOICED SOUND MARK UPPER HA
+3035; DISALLOWED # VERTICAL KANA REPEAT MARK LOWER HALF
+303B; DISALLOWED # VERTICAL IDEOGRAPHIC ITERATION MARK
+
+
+=BackwardCompatible (G)=
+G: cp is in {}
+
+=Unassigned (J)=
+J: General_Category(cp) is in {Cn} and Noncharacter_Code_Point(cp) = False
+
+=ASCII7 (K)=
+K: cp is in {0021..007E}
+(printable 7-bit ASCII)
+
+=JoinControl (H)=
+H: Join_Control(cp) = True
+Join_Control from PropList.txt
+
+=OldHangulJamo (I)=
+I: Hangul_Syllable_Type(cp) is in {L, V, T}
+Hangul_Syllable_Typ from HangulSyllableType.txt
+
+=PrecisIgnorableProperties (M)=
+M: Default_Ignorable_Code_Point(cp) = True or
+   Noncharacter_Code_Point(cp) = True
+Default_Ignorable_Code_Point from DerivedCoreProperties.txt
+
+=Controls (L)=
+L: Control(cp) = True
+
+=HasCompat (Q)=
+Q: toNFKC(cp) != cp
+
+=LetterDigits (A)=
+A: General_Category(cp) is in {Ll, Lu, Lo, Nd, Lm, Mn, Mc}
+
+=OtherLetterDigits (R)=
+R: General_Category(cp) is in {Lt, Nl, No, Me}
+
+=Spaces (N)=
+N: General_Category(cp) is in {Zs}
+
+=Symbols (O)=
+O: General_Category(cp) is in {Sm, Sc, Sk, So}
+
+=Punctuation (P)=
+P: General_Category(cp) is in {Pc, Pd, Ps, Pe, Pi, Pf, Po}
