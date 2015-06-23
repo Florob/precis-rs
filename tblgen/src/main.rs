@@ -1,7 +1,7 @@
 extern crate hyper;
 extern crate unicode_normalization;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::iter;
@@ -99,7 +99,7 @@ enum HangulSyllableType {
     VowelJamo,    // V
     TrailingJamo, // T
     LVSyllable,   // LV
-    LVTSyllable  // LVT
+    LVTSyllable   // LVT
 }
 
 impl FromStr for HangulSyllableType {
@@ -389,7 +389,7 @@ pub fn precis_result(c: char) -> PrecisResult {
 }
 
 fn write_script_table<W: Write>(out: &mut W, script: &Vec<(u32, u32, String)>) {
-    let scripts: HashSet<&String> = script.iter().map(|&(_, _, ref x)| x).collect();
+    let scripts: BTreeSet<&String> = script.iter().map(|&(_, _, ref x)| x).collect();
 
     writeln!(out, "{}", r#"
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -405,7 +405,7 @@ pub fn script(c: char) -> Script {
     let c = c as u32;
     match SCRIPT.binary_search_by(|&(lo, hi, _)| {
         if hi < c { Less }
-        else c < lo { Greater }
+        else if c < lo { Greater }
         else { Equal }
     }) {
         Ok(idx) => SCRIPT[idx].2,
@@ -518,24 +518,28 @@ fn main() {
         }
     });
 
+    fn join_adjacent<T: PartialEq>(mut v: Vec<(u32, u32, T)>) -> Vec<(u32, u32, T)> {
+        v.sort_by(|x, y| x.0.cmp(&y.0));
+        v.into_iter().fold(Vec::new(), |mut acc, elem| {
+            let mut same = false;
+            if let Some(last) = acc.last_mut() {
+                if last.2 == elem.2 && last.1 == elem.0 - 1 {
+                    last.1 = elem.1;
+                    same = true;
+                }
+            }
+            if same { return acc; }
+            acc.push(elem);
+            acc
+        })
+    }
+
     let mut script: Vec<(u32, u32, String)> = Vec::new();
     parse_props_file("Scripts.txt", |first, last, prop| {
         let prop = prop.replace("_", "");
         script.push((first, last.unwrap_or(first), prop));
     });
-    script.sort_by(|x, y| x.0.cmp(&y.0));
-    let script = script.into_iter().fold(Vec::new(), |mut acc: Vec<(u32, u32, String)>, elem| {
-        let mut same = false;
-        if let Some(last) = acc.last_mut() {
-            if last.2 == elem.2 && last.1 == elem.0 - 1 {
-                last.1 = elem.1;
-                same = true;
-            }
-        }
-        if same { return acc; }
-        acc.push(elem);
-        acc
-    });
+    let script = join_adjacent(script);
 
     let exceptions = make_exceptions();
     let back_compat: HashMap<u32, PrecisResult> = HashMap::new();
