@@ -118,6 +118,32 @@ impl FromStr for HangulSyllableType {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
+enum JoiningType {
+    RightJoining, // R
+    LeftJoining,  // L
+    DualJoining,  // D
+    JoinCausing,  // C
+    NonJoining,   // U
+    Transparent   // T
+}
+
+impl FromStr for JoiningType {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<JoiningType, ()> {
+        match s {
+            "R" => Ok(JoiningType::RightJoining),
+            "L" => Ok(JoiningType::LeftJoining),
+            "D" => Ok(JoiningType::DualJoining),
+            "C" => Ok(JoiningType::JoinCausing),
+            "U" => Ok(JoiningType::NonJoining),
+            "T" => Ok(JoiningType::Transparent),
+            _ => Err(())
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum PrecisResult {
     PValid,
     FreePValid,
@@ -415,11 +441,43 @@ pub fn script(c: char) -> Script {
 "#).unwrap();
 
     writeln!(out, "pub static SCRIPT: &'static [(u32, u32, Script)] = &[").unwrap();
-
     for &(lo, hi, ref s) in script {
         writeln!(out, "    (0x{:04x}, 0x{:04x}, Script::{}),", lo, hi, s).unwrap();
     }
     writeln!(out, "];").unwrap();
+}
+
+fn write_joining_type_table<W: Write>(out: &mut W, joining_type: &Vec<(u32, u32, JoiningType)>) {
+    writeln!(out, "{}", r#"
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum JoiningType {
+    RightJoining, // R
+    LeftJoining,  // L
+    DualJoining,  // D
+    JoinCausing,  // C
+    NonJoining,   // U
+    Transparent   // T
+}
+
+pub fn joining_type(c: char) -> JoiningType {
+    let c = c as u32;
+    match JOINING_TYPE.binary_search_by(|&(lo, hi, _)| {
+        if hi < c { Less }
+        else if c < lo { Greater }
+        else { Equal }
+    }) {
+        Ok(idx) => JOINING_TYPE[idx].2,
+        Err(_) => JoiningType::NonJoining
+    }
+}
+"#).unwrap();
+
+    write!(out, "pub static JOINING_TYPE: &'static [(u32, u32, JoiningType)] = &[").unwrap();
+    for (i, &(lo, hi, ref j)) in joining_type.iter().enumerate() {
+        if i % 2 == 0 { write!(out, "\n   ").unwrap(); }
+        write!(out, " (0x{:04x}, 0x{:04x}, JoiningType::{:?}),", lo, hi, j).unwrap();
+    }
+    writeln!(out, "\n];").unwrap();
 }
 
 fn main() {
@@ -541,13 +599,18 @@ fn main() {
     });
     let script = join_adjacent(script);
 
+    let mut joining_type: Vec<(u32, u32, JoiningType)> = Vec::new();
+    parse_props_file("extracted/DerivedJoiningType.txt", |first, last, prop| {
+        joining_type.push((first, last.unwrap_or(first), prop.parse().unwrap()));
+    });
+    let joining_type = join_adjacent(joining_type);
+
     let exceptions = make_exceptions();
     let back_compat: HashMap<u32, PrecisResult> = HashMap::new();
 
     let mut out = File::create("precis-table.rs").unwrap();
     write_precis_table(&mut out, &gcs, &jcs, &noncharacters, &default_ignorable,
                        &hangul_syllable_type, &exceptions, &back_compat);
-
     write_script_table(&mut out, &script);
-
+    write_joining_type_table(&mut out, &joining_type);
 }
