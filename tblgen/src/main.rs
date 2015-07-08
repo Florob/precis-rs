@@ -480,6 +480,27 @@ pub fn joining_type(c: char) -> JoiningType {
     writeln!(out, "\n];").unwrap();
 }
 
+fn write_case_folding_table<W: Write>(out: &mut W, case_folded: &Vec<(u32, Vec<u32>)>) {
+    writeln!(out, "{}", r#"
+pub fn case_folded(c: char) -> Option<&'static [char]> {
+    let c = c as u32;
+    CASE_FOLDING.binary_search_by(|&(v, _)| {
+        if v < c { Less }
+        else if c < v { Greater }
+        else { Equal }
+    }).ok().map(|idx| CASE_FOLDING[idx].1)
+}
+"#).unwrap();
+
+    write!(out, "pub static CASE_FOLDING: &'static [(u32, &'static [char])] = &[").unwrap();
+    for (i, &(c, ref l)) in case_folded.iter().enumerate() {
+        if i % 2 == 0 { write!(out, "\n   ").unwrap(); }
+        let v: Vec<String> = l.iter().map(|x| format!("'\\u{{{:04x}}}'", x)).collect();
+        write!(out, " (0x{:04x}, &[{}]),", c, v.connect(", ")).unwrap();
+    }
+    writeln!(out, "\n];").unwrap();
+}
+
 fn main() {
     const SEPS: &'static [char] = &[';', '#'];
 
@@ -514,7 +535,7 @@ fn main() {
     gcs.push(GeneralCategory::Unassigned); // U+10FFFE
     gcs.push(GeneralCategory::Unassigned); // U+10FFFF
 
-    fn parse_props_file<F>(file: &str, mut f: F) where F: FnMut(u32, Option<u32>, &str) {
+    fn parse_props_file<F>(file: &str, mut f: F) where F: FnMut(u32, Option<u32>, Vec<&str>) {
         let mut client = Client::new();
         let (x, y, z) = unicode_normalization::UNICODE_VERSION;
         let url = format!("http://www.unicode.org/Public/{}.{}.{}/ucd/{}", x, y, z, file);
@@ -526,18 +547,18 @@ fn main() {
             if line.len() == 0 || line.starts_with('#') { continue; }
             let mut fields = line.split(SEPS);
             let cps = fields.next().unwrap().trim_right_matches(' ');
-            let prop = fields.next().unwrap().trim_matches(' ');
+            let props: Vec<&str> = fields.map(|x| x.trim_matches(' ')).collect();
             let mut cps = cps.split("..");
             let first = cps.next().and_then(|x| u32::from_str_radix(x, 16).ok()).unwrap();
             let last = cps.next().and_then(|x| u32::from_str_radix(x, 16).ok());
-            f(first, last, prop);
+            f(first, last, props);
         }
     }
 
     let mut noncharacters: HashSet<u32> = HashSet::new();
     let mut jcs: HashSet<u32> = HashSet::new();
-    parse_props_file("PropList.txt", |first, last, prop| {
-        match prop {
+    parse_props_file("PropList.txt", |first, last, props| {
+        match props[0] {
             "Noncharacter_Code_Point" => {
                 if let Some(last) = last {
                     noncharacters.extend(first..(last + 1));
@@ -557,8 +578,8 @@ fn main() {
     });
 
     let mut default_ignorable: HashSet<u32> = HashSet::new();
-    parse_props_file("DerivedCoreProperties.txt", |first, last, prop| {
-        if prop != "Default_Ignorable_Code_Point" { return; }
+    parse_props_file("DerivedCoreProperties.txt", |first, last, props| {
+        if props[0] != "Default_Ignorable_Code_Point" { return; }
         if let Some(last) = last {
             default_ignorable.extend(first..(last + 1));
         } else {
@@ -567,8 +588,8 @@ fn main() {
     });
 
     let mut hangul_syllable_type: HashMap<u32, HangulSyllableType> = HashMap::new();
-    parse_props_file("HangulSyllableType.txt", |first, last, prop| {
-        let ty = prop.parse().unwrap();
+    parse_props_file("HangulSyllableType.txt", |first, last, props| {
+        let ty = props[0].parse().unwrap();
         if let Some(last) = last {
             hangul_syllable_type.extend((first..(last + 1)).zip(iter::repeat(ty)));
         } else {
@@ -593,17 +614,25 @@ fn main() {
     }
 
     let mut script: Vec<(u32, u32, String)> = Vec::new();
-    parse_props_file("Scripts.txt", |first, last, prop| {
-        let prop = prop.replace("_", "");
+    parse_props_file("Scripts.txt", |first, last, props| {
+        let prop = props[0].replace("_", "");
         script.push((first, last.unwrap_or(first), prop));
     });
     let script = join_adjacent(script);
 
     let mut joining_type: Vec<(u32, u32, JoiningType)> = Vec::new();
-    parse_props_file("extracted/DerivedJoiningType.txt", |first, last, prop| {
-        joining_type.push((first, last.unwrap_or(first), prop.parse().unwrap()));
+    parse_props_file("extracted/DerivedJoiningType.txt", |first, last, props| {
+        joining_type.push((first, last.unwrap_or(first), props[0].parse().unwrap()));
     });
     let joining_type = join_adjacent(joining_type);
+
+    let mut case_folded: Vec<(u32, Vec<u32>)> = Vec::new();
+    parse_props_file("CaseFolding.txt", |first, last, props| {
+        assert!(last.is_none());
+        if props[0] != "C" && props[0] != "F" { return; }
+        let folded = props[1].split(' ').map(|x| u32::from_str_radix(x, 16).unwrap()).collect();
+        case_folded.push((first, folded));
+    });
 
     let exceptions = make_exceptions();
     let back_compat: HashMap<u32, PrecisResult> = HashMap::new();
@@ -613,4 +642,5 @@ fn main() {
                        &hangul_syllable_type, &exceptions, &back_compat);
     write_script_table(&mut out, &script);
     write_joining_type_table(&mut out, &joining_type);
+    write_case_folding_table(&mut out, &case_folded);
 }

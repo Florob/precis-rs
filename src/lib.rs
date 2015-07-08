@@ -3,7 +3,10 @@ extern crate unicode_normalization;
 use table::{precis_result, PrecisResult};
 
 mod table;
+mod case_fold;
 mod context;
+
+pub use case_fold::to_casefold;
 
 pub fn check_identifier_class(s: &str) -> bool {
     s.char_indices().all(|(off, c)| match precis_result(c) {
