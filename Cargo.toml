@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Florian Zeitz <florob@babelmonkeys.de>"]
 
 [dependencies]
-unicode-normalization = "*"
+unicode-normalization = "0.1.1"
