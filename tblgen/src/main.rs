@@ -504,7 +504,7 @@ pub fn case_folded(c: char) -> Option<&'static [char]> {
 fn main() {
     const SEPS: &'static [char] = &[';', '#'];
 
-    let mut client = Client::new();
+    let client = Client::new();
 
     let (x, y, z) = unicode_normalization::UNICODE_VERSION;
     let url = format!("http://www.unicode.org/Public/{}.{}.{}/ucd/UnicodeData.txt", x, y, z);
@@ -536,7 +536,7 @@ fn main() {
     gcs.push(GeneralCategory::Unassigned); // U+10FFFF
 
     fn parse_props_file<F>(file: &str, mut f: F) where F: FnMut(u32, Option<u32>, Vec<&str>) {
-        let mut client = Client::new();
+        let client = Client::new();
         let (x, y, z) = unicode_normalization::UNICODE_VERSION;
         let url = format!("http://www.unicode.org/Public/{}.{}.{}/ucd/{}", x, y, z, file);
         let file = client.get(&url).send().unwrap();
